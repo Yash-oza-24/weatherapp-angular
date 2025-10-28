@@ -1,0 +1,38 @@
+<div class="weather-container">
+    <h2>🌦️ Weather App</h2>
+  
+    <div class="weather-input-field">
+      <input 
+        type="text" 
+        [(ngModel)]="city" 
+        placeholder="Enter city name" 
+        (keydown.enter)="getWeather()" />
+      <button (click)="getWeather()">Get Weather</button>
+    </div>
+  
+    <div *ngIf="error" class="error">{{ error }}</div>
+  
+    <div *ngIf="weatherData" class="weather-result">
+      <h3>{{ city }} - <span class="today-label">Today</span></h3>
+      <fa-icon [icon]="weatherIcon" class="weather-icon"></fa-icon>
+  
+      <p>🌡️ Temperature: {{ weatherData.temp }} °C</p>
+      <p>🌤️ Conditions: {{ weatherData.conditions }}</p>
+      <p>💧 Humidity: {{ weatherData.humidity }}%</p>
+      <p>💨 Wind Speed: {{ weatherData.windspeed }} km/h</p>
+    </div>
+  
+    <!-- 5-Day Forecast -->
+    <div *ngIf="forecast.length" class="forecast">
+      <h4>5-Day Forecast</h4>
+      <div class="forecast-cards">
+        <div class="forecast-card" *ngFor="let day of forecast">
+          <p class="date">{{ day.datetime | date : "EEE, MMM d" }}</p>
+          <fa-icon [icon]="getWeatherIcon(day.conditions)" class="forecast-icon"></fa-icon>
+          <p class="temp">{{ day.temp }}°C</p>
+          <p class="cond">{{ day.conditions }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
