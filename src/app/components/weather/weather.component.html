@@ -1,38 +1,227 @@
-<div class="weather-container">
-    <h2>🌦️ Weather App</h2>
-  
-    <div class="weather-input-field">
-      <input 
-        type="text" 
-        [(ngModel)]="city" 
-        placeholder="Enter city name" 
-        (keydown.enter)="getWeather()" />
-      <button (click)="getWeather()">Get Weather</button>
-    </div>
-  
-    <div *ngIf="error" class="error">{{ error }}</div>
-  
-    <div *ngIf="weatherData" class="weather-result">
-      <h3>{{ city }} - <span class="today-label">Today</span></h3>
-      <fa-icon [icon]="weatherIcon" class="weather-icon"></fa-icon>
-  
-      <p>🌡️ Temperature: {{ weatherData.temp }} °C</p>
-      <p>🌤️ Conditions: {{ weatherData.conditions }}</p>
-      <p>💧 Humidity: {{ weatherData.humidity }}%</p>
-      <p>💨 Wind Speed: {{ weatherData.windspeed }} km/h</p>
-    </div>
-  
-    <!-- 5-Day Forecast -->
-    <div *ngIf="forecast.length" class="forecast">
-      <h4>5-Day Forecast</h4>
-      <div class="forecast-cards">
-        <div class="forecast-card" *ngFor="let day of forecast">
-          <p class="date">{{ day.datetime | date : "EEE, MMM d" }}</p>
-          <fa-icon [icon]="getWeatherIcon(day.conditions)" class="forecast-icon"></fa-icon>
-          <p class="temp">{{ day.temp }}°C</p>
-          <p class="cond">{{ day.conditions }}</p>
+<div class="analytics-wrapper">
+  <div class="analytics-container">
+    <!-- Header -->
+    <header class="analytics-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <fa-icon [icon]="faSun"></fa-icon>
+        </div>
+        <div>
+          <h1>Weather Analytics</h1>
+          <span class="brand-subtitle">Real-time meteorological data</span>
+        </div>
+      </div>
+      <div class="header-meta">
+        <span class="meta-item">
+          <fa-icon [icon]="faClock"></fa-icon>
+          {{ currentTime }}
+        </span>
+        <span class="meta-item">{{ currentDate }}</span>
+      </div>
+      <div class="search-block">
+        <div class="search-bar">
+          <fa-icon [icon]="faMagnifyingGlass" class="search-icon"></fa-icon>
+          <input
+            type="text"
+            [(ngModel)]="city"
+            placeholder="Search location..."
+            (keydown.enter)="getWeather()"
+            aria-label="Search city"
+          />
+          <button class="search-btn" (click)="getWeather()" [disabled]="loading" aria-label="Search">
+            <fa-icon *ngIf="!loading" [icon]="faMagnifyingGlass"></fa-icon>
+            <fa-icon *ngIf="loading" [icon]="faSpinner" [spin]="true"></fa-icon>
+          </button>
+        </div>
+        <div class="search-actions">
+          <button class="action-btn" (click)="detectUserLocation(false)" [disabled]="locationLoading" aria-label="My location">
+            <fa-icon *ngIf="!locationLoading" [icon]="faLocationDot"></fa-icon>
+            <fa-icon *ngIf="locationLoading" [icon]="faSpinner" [spin]="true"></fa-icon>
+            {{ locationLoading ? 'Locating...' : 'Location' }}
+          </button>
+          <button class="action-btn unit-btn" (click)="toggleUnit()" [attr.aria-label]="'Switch to ' + (unit === 'C' ? 'Fahrenheit' : 'Celsius')">
+            °{{ unit === 'C' ? 'F' : 'C' }}
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Saved Cities -->
+    <div *ngIf="savedCities.length" class="saved-row" [@staggerIn]="savedCities.length">
+      <span class="saved-label">Quick access:</span>
+      <div class="saved-chips" role="list">
+        <div
+          *ngFor="let saved of savedCities"
+          class="chip"
+          role="listitem"
+        >
+          <button class="chip-select" (click)="selectSavedCity(saved.name)" [attr.aria-label]="'Load ' + saved.name">
+            {{ saved.name }}
+          </button>
+          <button class="chip-remove" (click)="removeSavedCity(saved.name)" [attr.aria-label]="'Remove ' + saved.name">
+            <fa-icon [icon]="faTrash"></fa-icon>
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- Error -->
+    <div *ngIf="error" class="alert alert-error" [@fadeSlideIn] role="alert">
+      <fa-icon [icon]="faLocationDot"></fa-icon> {{ error }}
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!weatherData && !loading && !error" class="empty-state">
+      <div class="empty-icon">
+        <fa-icon [icon]="faSun"></fa-icon>
+      </div>
+      <h2>Weather Analytics</h2>
+      <p>Enter a city or location above to view real-time meteorological data, forecasts, and environmental metrics.</p>
+    </div>
+
+    <!-- Dashboard Content -->
+    <main class="dashboard-main" *ngIf="weatherData || loading">
+      <!-- Loading skeleton -->
+      <div *ngIf="loading" class="loading-skeleton" [@fadeSlideIn]>
+        <div class="skeleton-hero">
+          <div class="skeleton-pulse skeleton-location"></div>
+          <div class="skeleton-pulse skeleton-temp"></div>
+        </div>
+        <div class="skeleton-cards">
+          <div class="skeleton-pulse skeleton-card" *ngFor="let i of [1,2,3,4,5,6]"></div>
+        </div>
+        <div class="skeleton-metrics">
+          <div class="skeleton-pulse skeleton-metric" *ngFor="let i of [1,2,3]"></div>
+        </div>
+        <div class="skeleton-message">
+          <fa-icon [icon]="faSpinner" [spin]="true"></fa-icon>
+          <span>Fetching weather data...</span>
+        </div>
+      </div>
+
+      <!-- Weather Data -->
+      <div *ngIf="weatherData && !loading" class="analytics-content" [@fadeSlideIn]>
+        <!-- Location hero bar -->
+        <section class="location-hero">
+          <div class="location-info">
+            <span class="location-pin"><fa-icon [icon]="faLocationDot"></fa-icon></span>
+            <h2 class="location-name">{{ lastSearchedCity }}</h2>
+          </div>
+          <button class="save-btn" (click)="saveCity()" [class.saved]="isCitySaved()" [disabled]="isCitySaved()" [attr.aria-label]="isCitySaved() ? 'City saved' : 'Save city'">
+            <fa-icon [icon]="faStar"></fa-icon>
+            <span>{{ isCitySaved() ? 'Saved' : 'Save city' }}</span>
+          </button>
+        </section>
+
+        <!-- Top Row: KPIs -->
+        <div class="dashboard-top">
+        <section class="kpi-grid">
+          <div class="kpi-card primary">
+            <span class="kpi-label">Current Temperature</span>
+            <span class="kpi-value">{{ convertTemp(weatherData.temp) }}°{{ unit }}</span>
+            <span class="kpi-sub">{{ weatherData.conditions }}</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Feels Like</span>
+            <span class="kpi-value">{{ convertTemp(weatherData.feelslike) }}°{{ unit }}</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Humidity</span>
+            <span class="kpi-value">{{ weatherData.humidity }}%</span>
+            <div class="kpi-bar"><div class="kpi-bar-fill" [style.width.%]="weatherData.humidity"></div></div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Wind Speed</span>
+            <span class="kpi-value">{{ weatherData.windspeed }} km/h</span>
+            <span class="kpi-sub">{{ getWindDirection(weatherData.windspeed) }}</span>
+          </div>
+          <div class="kpi-card" [style.--accent]="getUVColor(weatherData.uvindex)">
+            <span class="kpi-label">UV Index</span>
+            <span class="kpi-value" [style.color]="getUVColor(weatherData.uvindex)">{{ weatherData.uvindex }}</span>
+            <span class="kpi-sub" [style.color]="getUVColor(weatherData.uvindex)">{{ getUVLabel(weatherData.uvindex) }}</span>
+          </div>
+          <div class="kpi-card" [style.--accent]="getAQIColor()">
+            <span class="kpi-label">Air Quality</span>
+            <span class="kpi-value" [style.color]="getAQIColor()">{{ airQualityIndex }}</span>
+            <span class="kpi-sub" [style.color]="getAQIColor()">{{ airQualityLabel }}</span>
+          </div>
+        </section>
+        </div>
+
+        <!-- Secondary Metrics (compact inline) -->
+        <section class="metrics-row">
+          <div class="metric-card">
+            <fa-icon [icon]="faEye" class="metric-icon"></fa-icon>
+            <div>
+              <span class="metric-label">Visibility</span>
+              <span class="metric-value">{{ weatherData.visibility }} km</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <fa-icon [icon]="faGauge" class="metric-icon"></fa-icon>
+            <div>
+              <span class="metric-label">Pressure</span>
+              <span class="metric-value">{{ weatherData.pressure }} hPa</span>
+            </div>
+          </div>
+          <div class="metric-card sun-card">
+            <div class="sun-info">
+              <div class="sun-item">
+                <span class="metric-label">Sunrise</span>
+                <span class="metric-value">{{ weatherData.sunrise }}</span>
+              </div>
+              <div class="sun-divider"></div>
+              <div class="sun-item">
+                <span class="metric-label">Sunset</span>
+                <span class="metric-value">{{ weatherData.sunset }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Bottom Row: Hourly + 7-Day side by side -->
+        <div class="dashboard-bottom">
+        <!-- Hourly Forecast -->
+        <section *ngIf="hourlyForecast.length" class="forecast-section" [@fadeSlideIn]>
+          <h3>
+            <fa-icon [icon]="faClock"></fa-icon>
+            Hourly Forecast
+          </h3>
+          <div class="hourly-scroll">
+            <div *ngFor="let hour of hourlyForecast" class="hourly-item">
+              <span class="hour-time">{{ getHourLabel(hour.datetime) }}</span>
+              <fa-icon [icon]="getWeatherIcon(hour.conditions || 'clear')" class="hour-icon"></fa-icon>
+              <span class="hour-temp">{{ convertTemp(hour.temp) }}°</span>
+              <span *ngIf="hour.precipprob > 0" class="hour-precip">{{ hour.precipprob }}%</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7-Day Forecast -->
+        <section *ngIf="forecast.length" class="forecast-section" [@fadeSlideIn]>
+          <h3>
+            <fa-icon [icon]="faCalendarDays"></fa-icon>
+            7-Day Forecast
+          </h3>
+          <div class="forecast-table" [@staggerIn]="forecast.length">
+            <div *ngFor="let day of forecast; let i = index" class="forecast-row">
+              <span class="col-day">{{ day.datetime | date: "EEE" }}</span>
+              <span class="col-date">{{ day.datetime | date: "MMM d" }}</span>
+              <fa-icon [icon]="getWeatherIcon(day.conditions)" class="col-icon"></fa-icon>
+              <span class="col-condition">{{ day.conditions }}</span>
+              <div class="col-temp">
+                <span class="temp-min">{{ convertTemp(day.tempmin) }}°</span>
+                <div class="temp-bar" [title]="'Range: ' + convertTemp(day.tempmin) + '° - ' + convertTemp(day.tempmax) + '°'">
+                  <div class="temp-bar-fill" [style.width.%]="getTempBarWidth(day)"></div>
+                </div>
+                <span class="temp-max">{{ convertTemp(day.tempmax) }}°</span>
+              </div>
+              <span class="col-humidity">{{ day.humidity }}%</span>
+            </div>
+          </div>
+        </section>
+        </div>
+      </div>
+    </main>
   </div>
-  
+</div>
